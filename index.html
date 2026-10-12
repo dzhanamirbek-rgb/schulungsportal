@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team Markus · Schulungsportal</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --navy:#0f1f3a; --navy-2:#1a2f52; --brass:#b8945a; --brass-d:#9a7840;
+  --bg:#f6f3ee; --card:#ffffff; --ink:#1b2333; --muted:#6b7385; --line:#e5e0d6;
+  --ok:#2f7d4f; --ok-bg:#e6f3ea; --warn:#a8641a; --warn-bg:#fbf0e1; --bad:#b0392f; --bad-bg:#f9e6e4;
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"IBM Plex Sans",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:600;line-height:1.2;margin:0 0 .4em;color:var(--navy)}
+h1{font-size:clamp(1.6rem,4vw,2.2rem)} h2{font-size:1.35rem} h3{font-size:1.1rem}
+a{color:var(--brass-d)}
+.top{background:var(--navy);color:#fff;position:sticky;top:0;z-index:10}
+.top .in{max-width:1080px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-family:Fraunces,serif;font-size:1.15rem;color:#fff;text-decoration:none;display:flex;align-items:center;gap:10px}
+.brand .dot{width:30px;height:30px;border-radius:50%;background:var(--brass);display:grid;place-items:center;font-size:.9rem;color:var(--navy);font-weight:600}
+.nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.nav a{color:#d9dfeb;text-decoration:none;padding:6px 10px;border-radius:8px;font-size:.92rem}
+.nav a.on,.nav a:hover{background:var(--navy-2);color:#fff}
+main{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.stack>*+*{margin-top:16px}
+.grid{display:grid;gap:14px}
+.btn{appearance:none;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:600;cursor:pointer;background:var(--navy);color:#fff;display:inline-flex;align-items:center;gap:8px;text-decoration:none;justify-content:center}
+.btn:hover{background:var(--navy-2)}
+.btn.brass{background:var(--brass);color:var(--navy)} .btn.brass:hover{background:#c9a66b}
+.btn.ghost{background:transparent;color:var(--navy);border:1px solid var(--line)} .btn.ghost:hover{background:#efeae1}
+.btn.sm{padding:6px 11px;font-size:.85rem;border-radius:8px}
+.btn.danger{background:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+label{display:block;font-size:.88rem;font-weight:500;margin:0 0 4px;color:var(--muted)}
+input,textarea,select{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--brass);border-color:var(--brass)}
+.field{margin-bottom:14px}
+.muted{color:var(--muted)} .small{font-size:.86rem}
+.err{background:var(--bad-bg);color:var(--bad);padding:10px 12px;border-radius:10px;font-size:.92rem}
+.note{background:var(--warn-bg);color:var(--warn);padding:10px 12px;border-radius:10px;font-size:.92rem}
+.okbox{background:var(--ok-bg);color:var(--ok);padding:10px 12px;border-radius:10px;font-size:.92rem}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.b-ok{background:var(--ok-bg);color:var(--ok)} .b-warn{background:var(--warn-bg);color:var(--warn)} .b-bad{background:var(--bad-bg);color:var(--bad)} .b-n{background:#edf0f5;color:#4b5568}
+.bar{height:8px;background:#ece7dd;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--brass);border-radius:99px;transition:width .4s}
+.auth{max-width:420px;margin:6vh auto 0}
+.tabs{display:flex;gap:6px;margin-bottom:18px}
+.tabs button{flex:1;border:1px solid var(--line);background:#fff;padding:10px;border-radius:10px;font:inherit;cursor:pointer;color:var(--muted)}
+.tabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.mod{display:flex;gap:14px;align-items:center;text-decoration:none;color:inherit}
+.mod .num{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-family:Fraunces,serif;font-weight:600;background:#efeae1;color:var(--navy)}
+.mod.done .num{background:var(--ok);color:#fff}
+.mod.locked{opacity:.55;cursor:not-allowed}
+.mod .meta{flex:1;min-width:0}
+.mod .meta b{display:block;font-size:1.02rem}
+a.card.mod:hover{border-color:var(--brass)}
+.video{position:relative;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden}
+.video>div,.video iframe{position:absolute;inset:0;width:100%!important;height:100%!important}
+.video .ph{display:grid;place-items:center;color:#cbd2e0;text-align:center;padding:20px}
+.q{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.q.wrong{border-color:var(--bad);background:#fffafa}
+.q p{margin:0 0 10px;font-weight:600}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--ink);font-weight:400;font-size:.98rem;margin:0}
+.opt:hover{background:#f6f3ee}
+.opt input{width:auto;margin-top:4px}
+.hero{background:linear-gradient(135deg,var(--navy),var(--navy-2));color:#fff;border-radius:var(--radius);padding:24px}
+.hero h1{color:#fff}
+.hero .bar{background:rgba(255,255,255,.18)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat b{display:block;font-family:Fraunces,serif;font-size:1.7rem;color:var(--navy)}
+.tbl{width:100%;border-collapse:collapse;font-size:.92rem}
+.tbl th{text-align:left;font-weight:600;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;padding:10px 8px;border-bottom:1px solid var(--line)}
+.tbl td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.scroll{overflow-x:auto}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:.92rem;z-index:50;box-shadow:0 6px 24px rgba(0,0,0,.2)}
+.loading{display:grid;place-items:center;padding:60px;color:var(--muted)}
+.qedit{border:1px dashed var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:#fcfbf8}
+@media (max-width:640px){
+  .two{grid-template-columns:1fr}
+  .tbl.cards thead{display:none}
+  .tbl.cards tr{display:block;border-bottom:1px solid var(--line);padding:10px 0}
+  .tbl.cards td{display:flex;justify-content:space-between;gap:12px;border:0;padding:4px 0}
+  .tbl.cards td::before{content:attr(data-l);color:var(--muted);font-size:.82rem}
+  .nav{margin-left:0;width:100%}
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="#/"><span class="dot">EM</span>Team Markus · Schulungsportal</a>
+  <nav class="nav" id="nav"></nav>
+</div></header>
+<main id="app"><div class="loading">Lädt …</div></main>
+
+<script>
+// ================= Konfiguration =================
+const SUPABASE_URL = 'https://ksbancrylvcnscnkejyr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_4LNHP6r0T2uJqIm0RVlfeA__aK6geOQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const INACTIVE_DAYS = 7;
+
+// ================= Helfer =================
+const $app = document.getElementById('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = d => d ? new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '–';
+const fmtDateTime = d => d ? new Date(d).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '–';
+const daysSince = d => d ? Math.floor((Date.now() - new Date(d)) / 864e5) : null;
+const firstName = n => (n || '').trim().split(/\s+/)[0] || '';
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2800); }
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
+function errText(e){
+  const m = (e && (e.message || e.error_description)) || String(e);
+  if (/Database error saving new user|Zugangscode/i.test(m)) return 'Der Zugangscode ist ungültig. Bitte frage Edgar nach dem aktuellen Code.';
+  if (/Invalid login credentials/i.test(m)) return 'E-Mail oder Passwort ist falsch.';
+  if (/already registered|already been registered/i.test(m)) return 'Diese E-Mail ist bereits registriert. Bitte melde dich an.';
+  if (/Password should be at least/i.test(m)) return 'Das Passwort muss mindestens 6 Zeichen haben.';
+  if (/Email not confirmed/i.test(m)) return 'Deine E-Mail ist noch nicht bestätigt.';
+  return m;
+}
+
+// Video-Link erkennen
+function parseVideo(url){
+  url = (url||'').trim();
+  if (!url) return null;
+  let m;
+  if ((m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/))) return {provider:'youtube', ref:m[1]};
+  if (/^[\w-]{11}$/.test(url)) return {provider:'youtube', ref:url};
+  if ((m = url.match(/vimeo\.com\/(?:video\/)?(\d+)(?:\/([\da-f]+))?(?:.*[?&]h=([\da-f]+))?/))) return {provider:'vimeo', ref: m[1] + ((m[2]||m[3]) ? '/' + (m[2]||m[3]) : '')};
+  return null;
+}
+function videoUrl(m){
+  if (!m.video_ref) return '';
+  if (m.provider === 'youtube') return 'https://youtu.be/' + m.video_ref;
+  const [id,h] = m.video_ref.split('/');
+  return 'https://vimeo.com/' + id + (h ? '/' + h : '');
+}
+
+// Bereiche (modules) und Videos (lessons): Reihenfolge = Bereich-Position, dann Video-Position
+function orderLessons(mods, ls){
+  const mi = {}; mods.forEach((m,i) => mi[m.id] = i);
+  return ls.filter(l => mi[l.module_id] !== undefined)
+    .sort((a,b) => mi[a.module_id] - mi[b.module_id] || a.position - b.position || new Date(a.created_at) - new Date(b.created_at));
+}
+// Nummerierung "2.3" = Bereich 2, Video 3
+function numbering(mods, lessons){
+  const out = {};
+  mods.forEach((m,i) => lessons.filter(l => l.module_id === m.id).forEach((l,j) => out[l.id] = `${i+1}.${j+1}`));
+  return out;
+}
+
+// ================= Zustand =================
+const S = { session:null, profile:null, modules:[], lessons:[], progress:{} };
+const hasQuiz = {}; // lesson_id -> Anzahl Fragen
+let cleanup = null; // aktiver Player
+
+async function loadMine(){
+  const [{data:mods,error:e1},{data:ls,error:e2},{data:prog,error:e3},{data:qc,error:e4}] = await Promise.all([
+    sb.from('modules').select('*').order('position').order('created_at'),
+    sb.from('lessons').select('*'),
+    sb.from('lesson_progress').select('*').eq('user_id', S.session.user.id),
+    sb.rpc('lesson_quiz_counts')
+  ]);
+  if (e1||e2||e3||e4) throw (e1||e2||e3||e4);
+  (qc||[]).forEach(r => hasQuiz[r.lesson_id] = r.n);
+  S.modules = mods; S.lessons = orderLessons(mods, ls); S.progress = {};
+  (prog||[]).forEach(p => S.progress[p.lesson_id] = p);
+}
+const lessonsOf = mid => S.lessons.filter(l => l.module_id === mid);
+function isDone(l){
+  const p = S.progress[l.id];
+  if (!p || !p.video_completed_at) return false;
+  return !!p.quiz_passed_at || hasQuiz[l.id] === 0;
+}
+function lessonStatus(l, idx){
+  const p = S.progress[l.id];
+  if (S.lessons.slice(0, idx).some(x => !isDone(x))) return 'locked';
+  if (isDone(l)) return 'done';
+  if (p && p.video_completed_at) return 'quiz';
+  if (p) return 'started';
+  return 'open';
+}
+const statusLabels = { done:['Abgeschlossen','b-ok'], quiz:['Fragen offen','b-warn'], started:['Begonnen','b-warn'], open:['Bereit','b-n'], locked:['Gesperrt','b-n'] };
+
+// ================= Navigation =================
+function setNav(){
+  const nav = document.getElementById('nav');
+  if (!S.session){ nav.innerHTML=''; return; }
+  const h = location.hash || '#/';
+  const items = [['#/','Meine Schulung']];
+  if (S.profile?.role === 'admin') items.push(['#/admin','Team-Übersicht'],['#/admin/module','Bereiche'],['#/admin/einstellungen','Einstellungen']);
+  const on = href =>
+    href === '#/' ? (h === '#/' || h.startsWith('#/modul/') || h.startsWith('#/video/'))
+    : href === '#/admin' ? (h === '#/admin' || h.startsWith('#/admin/partner'))
+    : href === '#/admin/module' ? (h.startsWith('#/admin/module') || h.startsWith('#/admin/video'))
+    : h.startsWith(href);
+  nav.innerHTML = items.map(([href,l]) => `<a href="${href}" class="${on(href) ? 'on':''}">${l}</a>`).join('')
+    + `<a href="#" id="logout">Abmelden</a>`;
+  document.getElementById('logout').onclick = async e => { e.preventDefault(); await sb.auth.signOut(); };
+}
+
+async function route(){
+  if (cleanup){ try{ cleanup(); }catch(e){} cleanup = null; }
+  setNav();
+  const h = (location.hash.replace(/^#/, '') || '/').split('?')[0];
+  const parts = h.split('/');
+  if (!S.session){ return viewAuth(h.startsWith('/registrieren') ? 'register' : 'login'); }
+  if (!S.profile){ $app.innerHTML = '<div class="loading">Profil wird geladen …</div>'; return; }
+  window.scrollTo(0,0);
+  try{
+    if (h.startsWith('/modul/')) return await viewArea(parts[2]);
+    if (h.startsWith('/video/')) return await viewLesson(parts[2]);
+    if (S.profile.role === 'admin'){
+      if (h === '/admin') return await viewAdmin();
+      if (h.startsWith('/admin/partner/')) return await viewPartner(parts[3]);
+      if (h === '/admin/module') return await viewModules();
+      if (h.startsWith('/admin/module/')) return await viewModuleEdit(parts[3]);
+      if (h.startsWith('/admin/video/')) return await viewLessonEdit(parts[3], parts[4]);
+      if (h === '/admin/einstellungen') return await viewSettings();
+    }
+    return await viewHome();
+  }catch(e){
+    console.error(e);
+    $app.innerHTML = `<div class="err">Fehler: ${esc(errText(e))}</div>`;
+  }
+}
+window.addEventListener('hashchange', route);
+
+// ================= Anmeldung =================
+function viewAuth(mode){
+  const params = new URLSearchParams((location.hash.split('?')[1]) || '');
+  const code = params.get('code') || '';
+  $app.innerHTML = `
+  <div class="auth stack">
+    <div style="text-align:center">
+      <h1>Willkommen im Team</h1>
+      <p class="muted">Hier findest du alle Schulungsvideos für deinen Start.</p>
+    </div>
+    <div class="card">
+      <div class="tabs"><button data-m="login" class="${mode==='login'?'on':''}">Anmelden</button><button data-m="register" class="${mode==='register'?'on':''}">Registrieren</button></div>
+      <form id="f">
+        ${mode==='register' ? `
+        <div class="field"><label>Vor- und Nachname</label><input name="name" required autocomplete="name"></div>` : ''}
+        <div class="field"><label>E-Mail</label><input name="email" type="email" required autocomplete="email"></div>
+        <div class="field"><label>Passwort</label><input name="pw" type="password" required minlength="6" autocomplete="${mode==='login'?'current-password':'new-password'}"></div>
+        ${mode==='register' ? `
+        <div class="field"><label>Zugangscode</label><input name="code" required value="${esc(code)}" autocomplete="off"><div class="small muted" style="margin-top:4px">Den Code bekommst du von Edgar.</div></div>` : ''}
+        <div id="msg"></div>
+        <button class="btn brass" style="width:100%">${mode==='login'?'Anmelden':'Konto erstellen'}</button>
+        ${mode==='login' ? `<p class="small muted" style="text-align:center;margin:14px 0 0">Passwort vergessen? Bitte melde dich bei Edgar, er setzt es zurück.</p>`:''}
+      </form>
+    </div>
+  </div>`;
+  $app.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { location.hash = b.dataset.m==='register' ? '#/registrieren' + (code?'?code='+encodeURIComponent(code):'') : '#/'; viewAuth(b.dataset.m); });
+  const f = document.getElementById('f'), msg = document.getElementById('msg');
+  f.onsubmit = async e => {
+    e.preventDefault(); msg.innerHTML=''; const btn=f.querySelector('button.btn'); btn.disabled=true;
+    const fd = new FormData(f);
+    try{
+      if (mode==='login'){
+        const { error } = await sb.auth.signInWithPassword({ email: fd.get('email').trim(), password: fd.get('pw') });
+        if (error) throw error;
+      } else {
+        const { data, error } = await sb.auth.signUp({ email: fd.get('email').trim(), password: fd.get('pw'),
+          options:{ data:{ full_name: fd.get('name').trim(), access_code: fd.get('code').trim() } } });
+        if (error) throw error;
+        if (!data.session){ msg.innerHTML = '<div class="okbox" style="margin-bottom:12px">Konto erstellt. Bitte bestätige deine E-Mail über den Link in deinem Postfach und melde dich dann an.</div>'; btn.disabled=false; return; }
+        location.hash = '#/';
+      }
+    }catch(err){ msg.innerHTML = `<div class="err" style="margin-bottom:12px">${esc(errText(err))}</div>`; btn.disabled=false; }
+  };
+}
+
+// ================= Teilnehmer: Übersicht (Bereiche) =================
+async function viewHome(){
+  await loadMine();
+  sb.rpc('touch_last_seen');
+  const st = {}; S.lessons.forEach((l,i) => st[l.id] = lessonStatus(l,i));
+  const total = S.lessons.length;
+  const done = S.lessons.filter(isDone).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  const allDone = total > 0 && done === total;
+  const next = S.lessons.find(l => !['done','locked'].includes(st[l.id]));
+  const nextMod = next && S.modules.find(m => m.id === next.module_id);
+  $app.innerHTML = `
+  <div class="stack">
+    <div class="hero stack">
+      <div>
+        <div class="small" style="color:var(--brass)">Hallo ${esc(firstName(S.profile.full_name))}</div>
+        <h1>${allDone ? 'Glückwunsch, du hast alles geschafft!' : 'Deine Einarbeitung'}</h1>
+        <div style="color:#cbd2e0">${done} von ${plural(total,'Video','Videos')} abgeschlossen</div>
+      </div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="row">
+        ${next ? `<a class="btn brass" href="#/video/${next.id}">${S.progress[next.id] ? 'Weitermachen' : 'Starten'}: ${esc(next.title)}</a>` : ''}
+        ${allDone ? `<button class="btn brass" id="cert">Zertifikat herunterladen</button>` : ''}
+      </div>
+      ${nextMod ? `<div class="small" style="color:#cbd2e0">Bereich: ${esc(nextMod.title)}</div>` : ''}
+    </div>
+    ${S.modules.length === 0 ? '<div class="card muted">Es sind noch keine Bereiche freigegeben.</div>' : ''}
+    <div class="grid">
+      ${S.modules.map((m,i) => {
+        const ls = lessonsOf(m.id), d = ls.filter(isDone).length;
+        const state = !ls.length ? 'empty' : d === ls.length ? 'done' : st[ls[0].id] === 'locked' ? 'locked' : 'open';
+        const badge = { done:['Abgeschlossen','b-ok'], locked:['Gesperrt','b-n'], empty:['Bald verfügbar','b-n'], open:[d ? 'In Arbeit' : 'Bereit', d ? 'b-warn' : 'b-n'] }[state];
+        const tag = (state === 'locked' || state === 'empty') ? 'div' : 'a';
+        const sub = state === 'empty' ? 'Hier kommen bald Videos.' : state === 'locked' ? 'Wird nach dem vorherigen Bereich freigeschaltet' : `${d} von ${plural(ls.length,'Video','Videos')}`;
+        return `<${tag} class="card mod ${state === 'empty' ? 'locked' : state}" ${tag === 'a' ? `href="#/modul/${m.id}"` : ''}>
+          <div class="num">${state === 'done' ? '✓' : i+1}</div>
+          <div class="meta"><b>${esc(m.title)}</b>
+            ${m.description ? `<div class="small muted">${esc(m.description)}</div>` : ''}
+            <div class="small muted">${sub}</div>
+            ${ls.length && state !== 'locked' ? `<div class="bar" style="margin-top:6px"><i style="width:${d/ls.length*100}%"></i></div>` : ''}
+          </div>
+          <span class="badge ${badge[1]}">${badge[0]}</span>
+        </${tag}>`;
+      }).join('')}
+    </div>
+  </div>`;
+  const c = document.getElementById('cert'); if (c) c.onclick = makeCertificate;
+}
+
+// ================= Teilnehmer: Bereich (Liste der Videos) =================
+async function viewArea(id){
+  await loadMine();
+  const mi = S.modules.findIndex(m => m.id === id);
+  if (mi < 0){ $app.innerHTML = '<div class="err">Bereich nicht gefunden.</div><p><a href="#/">Zur Übersicht</a></p>'; return; }
+  const m = S.modules[mi], ls = lessonsOf(m.id), d = ls.filter(isDone).length;
+  const num = numbering(S.modules, S.lessons);
+  $app.innerHTML = `
+  <div class="stack">
+    <a href="#/" class="small">← Zur Übersicht</a>
+    <div><div class="small muted">Bereich ${mi+1} von ${S.modules.length}</div><h1>${esc(m.title)}</h1>
+      ${m.description ? `<p class="muted" style="margin:0">${esc(m.description)}</p>` : ''}
+      <div class="small muted" style="margin-top:6px">${d} von ${plural(ls.length,'Video','Videos')} abgeschlossen</div></div>
+    <div class="bar"><i style="width:${ls.length ? d/ls.length*100 : 0}%"></i></div>
+    ${ls.length === 0 ? '<div class="card muted">In diesem Bereich sind noch keine Videos.</div>' : ''}
+    <div class="grid">
+      ${ls.map(l => {
+        const idx = S.lessons.indexOf(l), s = lessonStatus(l, idx), p = S.progress[l.id];
+        const [lbl, cls] = statusLabels[s];
+        const tag = s === 'locked' ? 'div' : 'a';
+        return `<${tag} class="card mod ${s}" ${s !== 'locked' ? `href="#/video/${l.id}"` : ''}>
+          <div class="num">${s === 'done' ? '✓' : num[l.id]}</div>
+          <div class="meta"><b>${esc(l.title)}</b>
+            <div class="small muted">${s === 'locked' ? 'Wird nach dem vorherigen Video freigeschaltet' : (p ? `${Math.round(p.watched_pct)} % angesehen` : esc(l.description))}</div>
+          </div>
+          <span class="badge ${cls}">${lbl}</span>
+        </${tag}>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+// ================= Teilnehmer: Video =================
+async function viewLesson(id){
+  await loadMine();
+  const idx = S.lessons.findIndex(l => l.id === id);
+  if (idx < 0){ $app.innerHTML = '<div class="err">Video nicht gefunden.</div><p><a href="#/">Zur Übersicht</a></p>'; return; }
+  const m = S.lessons[idx];
+  const area = S.modules.find(x => x.id === m.module_id);
+  const inArea = lessonsOf(area.id), pos = inArea.indexOf(m) + 1;
+  if (lessonStatus(m, idx) === 'locked'){ $app.innerHTML = `<div class="note">Dieses Video ist noch gesperrt. Schau dir zuerst die vorherigen Videos an.</div><p><a href="#/">Zur Übersicht</a></p>`; return; }
+  const nextL = S.lessons[idx+1];
+  $app.innerHTML = `
+  <div class="stack">
+    <a href="#/modul/${area.id}" class="small">← ${esc(area.title)}</a>
+    <div><div class="small muted">Video ${pos} von ${inArea.length}</div><h1>${esc(m.title)}</h1>${m.description?`<p class="muted" style="margin:0">${esc(m.description)}</p>`:''}</div>
+    <div class="video" id="video"></div>
+    <div class="card">
+      <div class="spread small"><span>Angesehen: <b id="pctTxt">0 %</b></span><span class="muted">Ab ${m.min_watch_pct} % gilt das Video als gesehen</span></div>
+      <div class="bar" style="margin-top:8px"><i id="pctBar" style="width:0"></i></div>
+      <p class="small muted" style="margin:10px 0 0">Vorspulen zählt nicht – nur tatsächlich angesehene Abschnitte werden gewertet. Dein Fortschritt wird automatisch gespeichert.</p>
+    </div>
+    <div id="quiz"></div>
+  </div>`;
+
+  const uid = S.session.user.id;
+  const key = `seen_${uid}_${m.id}`, posKey = `pos_${uid}_${m.id}`;
+  const seen = new Set(lsGet(key) || []);
+  let ticks = 0, duration = 0, lastT = null, lastSent = -1, completed = !!S.progress[m.id]?.video_completed_at, quizShown = false;
+  const serverSeen = S.progress[m.id]?.watched_seconds || 0;
+
+  const pctTxt = document.getElementById('pctTxt'), pctBar = document.getElementById('pctBar');
+  function updateUI(){
+    const cnt = Math.max(seen.size, serverSeen);
+    const pct = duration ? Math.min(100, Math.round(cnt / duration * 100)) : Math.round(S.progress[m.id]?.watched_pct || 0);
+    const show = completed ? Math.max(pct, m.min_watch_pct) : pct;
+    pctTxt.textContent = show + ' %'; pctBar.style.width = show + '%';
+  }
+  updateUI();
+
+  async function send(force){
+    if (!duration) return;
+    const cnt = seen.size;
+    if (!force && cnt === lastSent) return;
+    lastSent = cnt;
+    lsSet(key, [...seen]);
+    const { data, error } = await sb.rpc('report_lesson_watch', { p_lesson: m.id, p_watched_seconds: cnt, p_duration: Math.floor(duration) });
+    if (error){ console.warn(error); return; }
+    S.progress[m.id] = data;
+    if (data.video_completed_at && !completed){ completed = true; toast('Video abgeschlossen ✓'); updateUI(); showQuiz(); }
+  }
+
+  function tick(t, playing){
+    if (playing && duration){
+      const s = Math.floor(t);
+      if (lastT !== null && s >= lastT && s - lastT <= 3){ for (let x = lastT; x <= s; x++) if (x < duration) seen.add(x); }
+      else if (lastT === null || Math.abs(s - lastT) <= 1) seen.add(s);
+      lastT = s;
+      updateUI();
+      if (++ticks % 10 === 0) send();
+      if (s % 5 === 0) lsSet(posKey, s);
+    } else { lastT = null; }
+  }
+
+  const box = document.getElementById('video');
+  if (!m.video_ref){
+    box.innerHTML = `<div class="ph">Für dieses Video ist noch kein Link hinterlegt.</div>`;
+  } else if (m.provider === 'youtube'){
+    await loadScript('https://www.youtube.com/iframe_api', () => window.YT && window.YT.Player, true);
+    box.innerHTML = '<div id="yt"></div>';
+    let timer;
+    const player = new YT.Player('yt', {
+      videoId: m.video_ref,
+      playerVars: { rel:0, modestbranding:1, playsinline:1, start: lsGet(posKey) || 0 },
+      events: {
+        onReady: () => { duration = player.getDuration(); updateUI();
+          timer = setInterval(() => { try{ if(!duration) duration = player.getDuration(); tick(player.getCurrentTime(), player.getPlayerState() === 1); }catch(e){} }, 1000); },
+        onStateChange: ev => { if (ev.data === 2 || ev.data === 0) send(true); }
+      }
+    });
+    cleanup = () => { clearInterval(timer); send(true); try{ player.destroy(); }catch(e){} };
+  } else {
+    await loadScript('https://player.vimeo.com/api/player.js', () => window.Vimeo && window.Vimeo.Player);
+    const [vid, h] = m.video_ref.split('/');
+    box.innerHTML = '<div id="vm"></div>';
+    const player = new Vimeo.Player('vm', { url: 'https://vimeo.com/' + vid + (h ? '/' + h : ''), responsive: false, playsinline: true });
+    let playing = false, cur = 0;
+    player.getDuration().then(d => { duration = d; updateUI(); const p = lsGet(posKey); if (p) player.setCurrentTime(p).catch(()=>{}); }).catch(()=>{});
+    player.on('play', () => playing = true);
+    player.on('pause', () => { playing = false; send(true); });
+    player.on('ended', () => { playing = false; send(true); });
+    player.on('timeupdate', d => { cur = d.seconds; if (!duration) duration = d.duration; });
+    player.on('seeked', () => { lastT = null; });
+    const timer = setInterval(() => tick(cur, playing), 1000);
+    cleanup = () => { clearInterval(timer); send(true); try{ player.destroy(); }catch(e){} };
+  }
+  const onHide = () => { if (document.visibilityState === 'hidden') send(true); };
+  document.addEventListener('visibilitychange', onHide);
+  const prevCleanup = cleanup;
+  cleanup = () => { document.removeEventListener('visibilitychange', onHide); prevCleanup && prevCleanup(); };
+
+  function nextLink(){
+    if (!nextL) return `<a class="btn brass" href="#/">Zur Übersicht</a>`;
+    const nextArea = S.modules.find(x => x.id === nextL.module_id);
+    return nextL.module_id === m.module_id
+      ? `<a class="btn brass" href="#/video/${nextL.id}">Weiter zu: ${esc(nextL.title)}</a>`
+      : `<a class="btn brass" href="#/video/${nextL.id}">Nächster Bereich: ${esc(nextArea.title)}</a>`;
+  }
+
+  async function showQuiz(){
+    if (quizShown) return; quizShown = true;
+    const qbox = document.getElementById('quiz');
+    const { data: qs, error } = await sb.rpc('get_lesson_quiz', { p_lesson: m.id });
+    if (error){ qbox.innerHTML = `<div class="err">${esc(errText(error))}</div>`; return; }
+    hasQuiz[m.id] = qs.length;
+    const p = S.progress[m.id];
+    if (!qs.length){ qbox.innerHTML = `<div class="card stack"><div class="okbox">Video abgeschlossen ✓</div><div>${nextLink()}</div></div>`; return; }
+    if (p?.quiz_passed_at){ qbox.innerHTML = `<div class="card stack"><h2>Kurze Fragen</h2><div class="okbox">Bestanden mit ${p.quiz_score} % ✓</div><div>${nextLink()}</div></div>`; return; }
+    qbox.innerHTML = `
+      <form class="card" id="qf">
+        <h2>Kurze Fragen</h2>
+        <p class="muted small">Beantworte die Fragen, um das Video abzuschließen. Zum Bestehen brauchst du ${m.pass_pct} %.</p>
+        ${qs.map((q,i) => `<div class="q" data-q="${q.id}"><p>${i+1}. ${esc(q.question)}</p>
+          ${q.options.map((o,j) => `<label class="opt"><input type="radio" name="${q.id}" value="${j}" required> <span>${esc(o)}</span></label>`).join('')}
+        </div>`).join('')}
+        <div id="qres"></div>
+        <button class="btn brass">Antworten prüfen</button>
+      </form>`;
+    const qf = document.getElementById('qf');
+    qf.onsubmit = async e => {
+      e.preventDefault();
+      const ans = {}; qs.forEach(q => { const v = qf.querySelector(`input[name="${q.id}"]:checked`); if (v) ans[q.id] = +v.value; });
+      const btn = qf.querySelector('button.btn'); btn.disabled = true;
+      const { data: r, error } = await sb.rpc('submit_lesson_quiz', { p_lesson: m.id, p_answers: ans });
+      btn.disabled = false;
+      if (error){ document.getElementById('qres').innerHTML = `<div class="err" style="margin-bottom:12px">${esc(errText(error))}</div>`; return; }
+      qf.querySelectorAll('.q').forEach((el,i) => el.classList.toggle('wrong', r.wrong.includes(i+1)));
+      if (r.passed){
+        S.progress[m.id] = { ...(S.progress[m.id]||{}), quiz_passed_at: new Date().toISOString(), quiz_score: r.score };
+        qbox.innerHTML = `<div class="card stack"><h2>Kurze Fragen</h2><div class="okbox">Bestanden! ${r.correct} von ${r.total} richtig (${r.score} %).</div><div>${nextLink()}</div></div>`;
+        toast('Video abgeschlossen ✓');
+      } else {
+        document.getElementById('qres').innerHTML = `<div class="note" style="margin-bottom:12px">${r.correct} von ${r.total} richtig (${r.score} %). Die rot markierten Fragen stimmen noch nicht – versuch es nochmal.</div>`;
+      }
+    };
+  }
+  if (completed) showQuiz();
+}
+
+function loadScript(src, ready, yt){
+  return new Promise((res, rej) => {
+    if (ready()) return res();
+    if (yt){ const prev = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = () => { prev && prev(); res(); }; }
+    if (!document.querySelector(`script[src="${src}"]`)){
+      const s = document.createElement('script'); s.src = src; s.onerror = rej;
+      if (!yt) s.onload = () => res();
+      document.head.appendChild(s);
+    } else if (!yt){ const iv = setInterval(() => { if (ready()){ clearInterval(iv); res(); } }, 100); }
+  });
+}
+
+// ================= Zertifikat =================
+function makeCertificate(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const W = 297, H = 210;
+  const lastDate = S.lessons.map(l => S.progress[l.id]?.quiz_passed_at || S.progress[l.id]?.video_completed_at).filter(Boolean).sort().pop();
+  doc.setFillColor(15,31,58); doc.rect(0,0,W,H,'F');
+  doc.setFillColor(246,243,238); doc.rect(10,10,W-20,H-20,'F');
+  doc.setDrawColor(184,148,90); doc.setLineWidth(1.2); doc.rect(16,16,W-32,H-32);
+  doc.setTextColor(184,148,90); doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text('TEAM MARKUS', W/2, 36, { align:'center' });
+  doc.setTextColor(15,31,58); doc.setFont('times','bold'); doc.setFontSize(38);
+  doc.text('Teilnahmezertifikat', W/2, 58, { align:'center' });
+  doc.setFont('helvetica','normal'); doc.setFontSize(13); doc.setTextColor(90,98,115);
+  doc.text('Hiermit wird bestätigt, dass', W/2, 76, { align:'center' });
+  doc.setFont('times','bold'); doc.setFontSize(28); doc.setTextColor(15,31,58);
+  doc.text(S.profile.full_name || S.profile.email, W/2, 92, { align:'center' });
+  doc.setFont('helvetica','normal'); doc.setFontSize(13); doc.setTextColor(90,98,115);
+  doc.text(`die Einarbeitung mit allen ${S.modules.length} Schulungsbereichen (${S.lessons.length} Videos) erfolgreich abgeschlossen hat:`, W/2, 106, { align:'center' });
+  doc.setFontSize(11); doc.setTextColor(27,35,51);
+  const titles = S.modules.map((m,i) => `${i+1}. ${m.title}`);
+  const col = titles.length > 6 ? 2 : 1;
+  const per = Math.ceil(titles.length / col);
+  titles.forEach((t,i) => {
+    const c = Math.floor(i / per), r = i % per;
+    const x = col === 1 ? W/2 : (c === 0 ? W/2 - 55 : W/2 + 55);
+    doc.text(t.length > 55 ? t.slice(0,54)+'…' : t, x, 118 + r*6.5, { align:'center' });
+  });
+  doc.setDrawColor(184,148,90); doc.setLineWidth(.4);
+  doc.line(50, 178, 120, 178); doc.line(W-120, 178, W-50, 178);
+  doc.setFontSize(10); doc.setTextColor(90,98,115);
+  doc.text(fmtDate(lastDate || new Date()), 85, 175, { align:'center' });
+  doc.text('Datum', 85, 184, { align:'center' });
+  doc.text('Edgar Markus', W-85, 184, { align:'center' });
+  doc.save(`Zertifikat_${(S.profile.full_name||'Teilnahme').replace(/\s+/g,'_')}.pdf`);
+}
+
+// ================= Admin: Daten =================
+async function loadAll(){
+  const [mods, ls, profs, prog, rem, qs] = await Promise.all([
+    sb.from('modules').select('*').order('position').order('created_at'),
+    sb.from('lessons').select('*'),
+    sb.from('profiles').select('*').order('created_at', { ascending:false }),
+    sb.from('lesson_progress').select('*'),
+    sb.from('reminders').select('*').order('sent_at', { ascending:false }),
+    sb.from('lesson_quiz').select('lesson_id')
+  ]);
+  for (const r of [mods, ls, profs, prog, rem, qs]) if (r.error) throw r.error;
+  const qCount = {}; qs.data.forEach(q => qCount[q.lesson_id] = (qCount[q.lesson_id]||0) + 1);
+  const lessons = orderLessons(mods.data, ls.data);
+  return { modules: mods.data, lessons, num: numbering(mods.data, lessons), profiles: profs.data, progress: prog.data, reminders: rem.data, qCount };
+}
+function summarize(D, p){
+  const mine = D.progress.filter(x => x.user_id === p.id);
+  const by = {}; mine.forEach(x => by[x.lesson_id] = x);
+  const done = D.lessons.filter(l => { const x = by[l.id]; return x && x.video_completed_at && (x.quiz_passed_at || !D.qCount[l.id]); });
+  const current = D.lessons.find(l => !done.includes(l));
+  const lastAct = [p.last_seen_at, ...mine.map(x => x.updated_at)].filter(Boolean).sort().pop();
+  const lastRem = D.reminders.find(r => r.user_id === p.id);
+  const total = D.lessons.length;
+  let status;
+  if (total && done.length === total) status = ['Abgeschlossen','b-ok'];
+  else if (!mine.length) status = (daysSince(p.created_at) >= INACTIVE_DAYS) ? ['Nicht begonnen','b-bad'] : ['Nicht begonnen','b-n'];
+  else if (daysSince(lastAct) >= INACTIVE_DAYS) status = [`Inaktiv seit ${daysSince(lastAct)} Tagen`,'b-bad'];
+  else status = ['In Arbeit','b-warn'];
+  return { by, done, current, lastAct, lastRem, total, status, needsReminder: status[1]==='b-bad' };
+}
+function reminderMail(D, p, s){
+  const area = s.current && D.modules.find(m => m.id === s.current.module_id);
+  const subject = 'Erinnerung: Deine Schulung im Teamportal';
+  const body = `Hallo ${firstName(p.full_name) || ''},
+
+kurze Erinnerung: In unserem Schulungsportal wartet noch ${s.current ? `das Video „${s.current.title}“ (Bereich „${area.title}“)` : 'deine Einarbeitung'} auf dich. Bisher hast du ${s.done.length} von ${s.total} Videos abgeschlossen.
+
+Hier geht es direkt weiter:
+${location.origin}${location.pathname}
+
+Viele Grüße
+Edgar`;
+  return { subject, body };
+}
+async function logReminder(ids){
+  const rows = ids.map(id => ({ user_id: id, sent_by: S.session.user.id }));
+  const { error } = await sb.from('reminders').insert(rows);
+  if (error) toast('Erinnerung konnte nicht protokolliert werden');
+}
+
+// ================= Admin: Team-Übersicht =================
+async function viewAdmin(){
+  const D = await loadAll();
+  const partners = D.profiles.filter(p => p.role === 'partner');
+  const rows = partners.map(p => ({ p, s: summarize(D, p) }));
+  const finished = rows.filter(r => r.s.status[1] === 'b-ok').length;
+  const inactive = rows.filter(r => r.s.needsReminder);
+  const avg = rows.length && D.lessons.length ? Math.round(rows.reduce((a,r) => a + r.s.done.length / D.lessons.length, 0) / rows.length * 100) : 0;
+  $app.innerHTML = `
+  <div class="stack">
+    <div class="spread"><div><h1>Team-Übersicht</h1><p class="muted" style="margin:0">Wer hat welche Videos angesehen und bestanden.</p></div>
+      <div class="row"><button class="btn ghost sm" id="csv">CSV exportieren</button>${inactive.length ? `<button class="btn sm" id="remAll">Alle ${inactive.length} Inaktiven erinnern</button>`:''}</div></div>
+    <div class="stats">
+      <div class="stat"><b>${partners.length}</b><span class="small muted">Teilnehmer</span></div>
+      <div class="stat"><b>${finished}</b><span class="small muted">komplett abgeschlossen</span></div>
+      <div class="stat"><b>${avg} %</b><span class="small muted">Ø Fortschritt</span></div>
+      <div class="stat"><b>${inactive.length}</b><span class="small muted">brauchen Erinnerung</span></div>
+    </div>
+    <div class="card scroll">
+      ${rows.length ? `<table class="tbl cards">
+        <thead><tr><th>Name</th><th>Fortschritt</th><th>Aktuelles Video</th><th>Zuletzt aktiv</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows.map(({p,s}) => `<tr>
+          <td data-l="Name"><a href="#/admin/partner/${p.id}"><b>${esc(p.full_name || '(ohne Namen)')}</b></a><div class="small muted">${esc(p.email)}</div></td>
+          <td data-l="Fortschritt" style="min-width:130px"><div class="small">${s.done.length}/${s.total}</div><div class="bar"><i style="width:${s.total? s.done.length/s.total*100:0}%"></i></div></td>
+          <td data-l="Aktuell">${s.current ? `${D.num[s.current.id]} ${esc(s.current.title)}` : '–'}</td>
+          <td data-l="Zuletzt aktiv">${fmtDateTime(s.lastAct)}${s.lastRem ? `<div class="small muted">erinnert ${fmtDate(s.lastRem.sent_at)}</div>`:''}</td>
+          <td data-l="Status"><span class="badge ${s.status[1]}">${s.status[0]}</span></td>
+          <td style="text-align:right">${s.status[1]!=='b-ok' ? `<button class="btn ghost sm" data-rem="${p.id}">Erinnern</button>`:''}</td>
+        </tr>`).join('')}</tbody></table>`
+      : `<p class="muted" style="margin:0">Noch niemand registriert. Teile den Registrierungslink aus den <a href="#/admin/einstellungen">Einstellungen</a>.</p>`}
+    </div>
+  </div>`;
+  $app.querySelectorAll('[data-rem]').forEach(b => b.onclick = async () => {
+    const p = partners.find(x => x.id === b.dataset.rem), s = summarize(D, p);
+    const { subject, body } = reminderMail(D, p, s);
+    location.href = `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    await logReminder([p.id]); setTimeout(viewAdmin, 800);
+  });
+  const ra = document.getElementById('remAll');
+  if (ra) ra.onclick = async () => {
+    const subject = 'Erinnerung: Deine Schulung im Teamportal';
+    const body = `Hallo zusammen,\n\nkurze Erinnerung: In unserem Schulungsportal warten noch Videos auf euch. Bitte schaut sie euch in den nächsten Tagen an.\n\nHier geht es weiter:\n${location.origin}${location.pathname}\n\nViele Grüße\nEdgar`;
+    location.href = `mailto:?bcc=${encodeURIComponent(inactive.map(r => r.p.email).join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    await logReminder(inactive.map(r => r.p.id)); setTimeout(viewAdmin, 800);
+  };
+  document.getElementById('csv').onclick = () => {
+    const head = ['Name','E-Mail','Registriert','Zuletzt aktiv','Abgeschlossen','Gesamt', ...D.lessons.map(l => `${D.num[l.id]} ${l.title} (angesehen %)`), ...D.lessons.map(l => `${D.num[l.id]} Fragen %`)];
+    const lines = rows.map(({p,s}) => [p.full_name, p.email, fmtDate(p.created_at), fmtDateTime(s.lastAct), s.done.length, s.total,
+      ...D.lessons.map(l => s.by[l.id] ? Math.round(s.by[l.id].watched_pct) : 0),
+      ...D.lessons.map(l => s.by[l.id]?.quiz_score ?? '')]);
+    const csv = [head, ...lines].map(r => r.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(';')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' }));
+    a.download = `Schulungsstand_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  };
+}
+
+// ================= Admin: Teilnehmer-Details =================
+async function viewPartner(id){
+  const D = await loadAll();
+  const p = D.profiles.find(x => x.id === id);
+  if (!p){ $app.innerHTML = '<div class="err">Teilnehmer nicht gefunden.</div>'; return; }
+  const s = summarize(D, p);
+  const rems = D.reminders.filter(r => r.user_id === id);
+  $app.innerHTML = `
+  <div class="stack">
+    <a href="#/admin" class="small">← Team-Übersicht</a>
+    <div class="spread"><div><h1>${esc(p.full_name || '(ohne Namen)')}</h1><div class="muted">${esc(p.email)} · registriert ${fmtDate(p.created_at)} · zuletzt aktiv ${fmtDateTime(s.lastAct)}</div></div>
+      <span class="badge ${s.status[1]}">${s.status[0]}</span></div>
+    <div class="card scroll"><table class="tbl cards">
+      <thead><tr><th>Video</th><th>Angesehen</th><th>Video fertig</th><th>Fragen</th><th>Versuche</th></tr></thead>
+      <tbody>${D.lessons.map(l => { const x = s.by[l.id]; const area = D.modules.find(m => m.id === l.module_id); return `<tr>
+        <td data-l="Video"><b>${D.num[l.id]} ${esc(l.title)}</b><div class="small muted">${esc(area.title)}</div></td>
+        <td data-l="Angesehen" style="min-width:120px">${x ? `<div class="small">${Math.round(x.watched_pct)} %</div><div class="bar"><i style="width:${x.watched_pct}%"></i></div>` : '<span class="muted">–</span>'}</td>
+        <td data-l="Video fertig">${x?.video_completed_at ? '✓ ' + fmtDate(x.video_completed_at) : '–'}</td>
+        <td data-l="Fragen">${!D.qCount[l.id] ? '<span class="muted">keine Fragen</span>' : x?.quiz_passed_at ? `<span class="badge b-ok">${x.quiz_score} %</span>` : x?.quiz_attempts ? `<span class="badge b-bad">${x.quiz_score ?? 0} %</span>` : '–'}</td>
+        <td data-l="Versuche">${x?.quiz_attempts || 0}</td></tr>`; }).join('')}</tbody></table></div>
+    <div class="card stack">
+      <h3>Erinnerungen</h3>
+      ${rems.length ? `<div class="small">${rems.map(r => fmtDateTime(r.sent_at)).join(' · ')}</div>` : '<div class="small muted">Noch keine Erinnerung gesendet.</div>'}
+      <div class="row">
+        ${s.status[1] !== 'b-ok' ? `<button class="btn sm" id="rem">Erinnerung per E-Mail</button>` : ''}
+        <button class="btn ghost sm" id="role">${p.role === 'admin' ? 'Admin-Rechte entfernen' : 'Zum Admin machen'}</button>
+        <button class="btn ghost sm" id="reset">Fortschritt zurücksetzen</button>
+        ${p.role !== 'admin' ? '<button class="btn danger sm" id="delUser">Mitarbeiter löschen</button>' : ''}
+      </div>
+    </div>
+  </div>`;
+  const rb = document.getElementById('rem');
+  if (rb) rb.onclick = async () => { const { subject, body } = reminderMail(D, p, s);
+    location.href = `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    await logReminder([p.id]); setTimeout(() => viewPartner(id), 800); };
+  document.getElementById('role').onclick = async () => {
+    const nr = p.role === 'admin' ? 'partner' : 'admin';
+    if (!confirm(nr === 'admin' ? `${p.full_name} Admin-Rechte geben? Die Person sieht dann alle Teilnehmer.` : 'Admin-Rechte entfernen?')) return;
+    const { error } = await sb.rpc('admin_set_role', { p_user: p.id, p_role: nr });
+    if (error) return toast(errText(error)); toast('Gespeichert'); viewPartner(id);
+  };
+  document.getElementById('reset').onclick = async () => {
+    if (!confirm('Gesamten Fortschritt dieser Person löschen? Das kann nicht rückgängig gemacht werden.')) return;
+    const { error } = await sb.from('lesson_progress').delete().eq('user_id', p.id);
+    if (error) return toast(errText(error)); toast('Fortschritt zurückgesetzt'); viewPartner(id);
+  };
+  const du = document.getElementById('delUser');
+  if (du) du.onclick = async () => {
+    if (!confirm(`${p.full_name || p.email} endgültig löschen?\n\nKonto, Fortschritt und Erinnerungen werden entfernt. Das kann nicht rückgängig gemacht werden.`)) return;
+    const { error } = await sb.rpc('admin_delete_user', { p_user: p.id });
+    if (error) return toast(errText(error));
+    toast('Mitarbeiter gelöscht'); location.hash = '#/admin';
+  };
+}
+
+// ================= Admin: Bereiche =================
+async function viewModules(){
+  const D = await loadAll();
+  const cnt = {}; D.lessons.forEach(l => cnt[l.module_id] = (cnt[l.module_id]||0) + 1);
+  $app.innerHTML = `
+  <div class="stack">
+    <div class="spread"><div><h1>Bereiche</h1><p class="muted" style="margin:0">Jeder Bereich enthält mehrere Videos. Reihenfolge = Freischalt-Reihenfolge für neue Partner.</p></div>
+      <a class="btn brass" href="#/admin/module/neu">+ Neuer Bereich</a></div>
+    <div class="grid">${D.modules.map((m,i) => `
+      <div class="card mod">
+        <div class="num">${i+1}</div>
+        <div class="meta"><b>${esc(m.title)}</b>
+          <div class="small muted">${plural(cnt[m.id]||0,'Video','Videos')}${m.description ? ' · ' + esc(m.description) : ''}</div></div>
+        <div class="row">
+          <button class="btn ghost sm" data-up="${i}" ${i===0?'disabled':''} aria-label="Nach oben">↑</button>
+          <button class="btn ghost sm" data-down="${i}" ${i===D.modules.length-1?'disabled':''} aria-label="Nach unten">↓</button>
+          <a class="btn sm" href="#/admin/module/${m.id}">Bearbeiten</a>
+        </div>
+      </div>`).join('') || '<div class="card muted">Noch keine Bereiche.</div>'}</div>
+  </div>`;
+  const move = async (i, j) => {
+    const list = D.modules.slice(); [list[i], list[j]] = [list[j], list[i]];
+    const res = await Promise.all(list.map((m,k) => sb.from('modules').update({ position: k+1 }).eq('id', m.id)));
+    const e = res.find(r => r.error); if (e) toast(errText(e.error)); viewModules();
+  };
+  $app.querySelectorAll('[data-up]').forEach(b => b.onclick = () => move(+b.dataset.up, +b.dataset.up - 1));
+  $app.querySelectorAll('[data-down]').forEach(b => b.onclick = () => move(+b.dataset.down, +b.dataset.down + 1));
+}
+
+async function viewModuleEdit(id){
+  const isNew = id === 'neu';
+  let m = { title:'', description:'' }, ls = [], qCount = {};
+  if (!isNew){
+    const [{ data: mm, error: e1 }, { data: ll, error: e2 }, { data: qq, error: e3 }] = await Promise.all([
+      sb.from('modules').select('*').eq('id', id).single(),
+      sb.from('lessons').select('*').eq('module_id', id).order('position').order('created_at'),
+      sb.from('lesson_quiz').select('lesson_id')
+    ]);
+    if (e1 || e2 || e3) throw (e1 || e2 || e3);
+    m = mm; ls = ll; qq.forEach(q => qCount[q.lesson_id] = (qCount[q.lesson_id]||0) + 1);
+  }
+  $app.innerHTML = `
+  <div class="stack">
+    <a href="#/admin/module" class="small">← Alle Bereiche</a>
+    <h1>${isNew ? 'Neuer Bereich' : 'Bereich bearbeiten'}</h1>
+    <form class="stack" id="mf">
+      <div class="card">
+        <div class="field"><label>Titel des Bereichs</label><input name="title" required value="${esc(m.title)}" placeholder="z. B. Grundlagen der Beratung"></div>
+        <div class="field"><label>Kurzbeschreibung</label><textarea name="description" rows="2" placeholder="Worum geht es in diesem Bereich?">${esc(m.description)}</textarea></div>
+        <div id="msg"></div>
+        <div class="spread">
+          <button class="btn brass">${isNew ? 'Bereich anlegen' : 'Speichern'}</button>
+          ${!isNew ? '<button type="button" class="btn danger sm" id="del">Bereich löschen</button>' : ''}
+        </div>
+      </div>
+    </form>
+    ${isNew ? '<div class="note">Nach dem Anlegen kannst du die Videos zu diesem Bereich hinzufügen.</div>' : `
+    <div class="spread"><h2 style="margin:0">Videos in diesem Bereich</h2><a class="btn brass sm" href="#/admin/video/neu/${id}">+ Neues Video</a></div>
+    <div class="grid">${ls.map((l,i) => `
+      <div class="card mod">
+        <div class="num">${i+1}</div>
+        <div class="meta"><b>${esc(l.title)}</b>
+          <div class="small muted">${l.video_ref ? (l.provider==='youtube'?'YouTube':'Vimeo') : '<span style="color:var(--bad)">Kein Video hinterlegt</span>'} · ${plural(qCount[l.id]||0,'Frage','Fragen')} · ab ${l.min_watch_pct} % gesehen</div></div>
+        <div class="row">
+          <button class="btn ghost sm" data-up="${i}" ${i===0?'disabled':''} aria-label="Nach oben">↑</button>
+          <button class="btn ghost sm" data-down="${i}" ${i===ls.length-1?'disabled':''} aria-label="Nach unten">↓</button>
+          <a class="btn sm" href="#/admin/video/${l.id}">Bearbeiten</a>
+        </div>
+      </div>`).join('') || '<div class="card muted">Noch keine Videos in diesem Bereich.</div>'}</div>`}
+  </div>`;
+  const f = document.getElementById('mf'), msg = document.getElementById('msg');
+  f.onsubmit = async e => {
+    e.preventDefault(); msg.innerHTML = '';
+    const fd = new FormData(f);
+    const row = { title: fd.get('title').trim(), description: fd.get('description').trim() };
+    const btn = f.querySelector('button.brass'); btn.disabled = true;
+    try{
+      if (isNew){
+        const { data: mx } = await sb.from('modules').select('position').order('position', { ascending:false }).limit(1);
+        row.position = (mx?.[0]?.position || 0) + 1;
+        const { data, error } = await sb.from('modules').insert(row).select().single(); if (error) throw error;
+        toast('Bereich angelegt'); location.hash = '#/admin/module/' + data.id;
+      } else {
+        const { error } = await sb.from('modules').update(row).eq('id', id); if (error) throw error;
+        toast('Gespeichert'); location.hash = '#/admin/module';
+      }
+    }catch(err){ msg.innerHTML = `<div class="err" style="margin-bottom:12px">${esc(errText(err))}</div>`; btn.disabled = false; }
+  };
+  const move = async (i, j) => {
+    const list = ls.slice(); [list[i], list[j]] = [list[j], list[i]];
+    const res = await Promise.all(list.map((l,k) => sb.from('lessons').update({ position: k+1 }).eq('id', l.id)));
+    const e = res.find(r => r.error); if (e) toast(errText(e.error)); viewModuleEdit(id);
+  };
+  $app.querySelectorAll('[data-up]').forEach(b => b.onclick = () => move(+b.dataset.up, +b.dataset.up - 1));
+  $app.querySelectorAll('[data-down]').forEach(b => b.onclick = () => move(+b.dataset.down, +b.dataset.down + 1));
+  const del = document.getElementById('del');
+  if (del) del.onclick = async () => {
+    if (!confirm(`Bereich „${m.title}“ inklusive aller ${ls.length} Videos, Fragen und Fortschritte löschen?`)) return;
+    const { error } = await sb.from('modules').delete().eq('id', id);
+    if (error) return toast(errText(error)); toast('Gelöscht'); location.hash = '#/admin/module';
+  };
+}
+
+// ================= Admin: Video bearbeiten =================
+async function viewLessonEdit(id, presetModule){
+  const isNew = id === 'neu';
+  const { data: mods, error: em } = await sb.from('modules').select('id,title').order('position').order('created_at');
+  if (em) throw em;
+  let m = { module_id: presetModule || mods[0]?.id, title:'', description:'', provider:'youtube', video_ref:'', min_watch_pct:90, pass_pct:80 }, qs = [];
+  if (!mods.length){ $app.innerHTML = '<div class="note">Lege zuerst einen Bereich an.</div><p><a href="#/admin/module/neu">+ Neuer Bereich</a></p>'; return; }
+  if (!isNew){
+    const [{ data: mm, error: e1 }, { data: qq, error: e2 }] = await Promise.all([
+      sb.from('lessons').select('*').eq('id', id).single(),
+      sb.from('lesson_quiz').select('*').eq('lesson_id', id).order('position')
+    ]);
+    if (e1 || e2) throw (e1 || e2);
+    m = mm; qs = qq;
+  }
+  $app.innerHTML = `
+  <form class="stack" id="mf">
+    <a href="#/admin/module/${m.module_id}" class="small">← Zurück zum Bereich</a>
+    <h1>${isNew ? 'Neues Video' : 'Video bearbeiten'}</h1>
+    <div class="card">
+      <div class="field"><label>Bereich</label><select name="module_id">${mods.map(x => `<option value="${x.id}" ${x.id===m.module_id?'selected':''}>${esc(x.title)}</option>`).join('')}</select></div>
+      <div class="field"><label>Titel des Videos</label><input name="title" required value="${esc(m.title)}"></div>
+      <div class="field"><label>Beschreibung</label><textarea name="description" rows="3" placeholder="Worum geht es in diesem Video?">${esc(m.description)}</textarea></div>
+      <div class="field"><label>Video-Link (YouTube oder Vimeo)</label><input name="url" value="${esc(videoUrl(m))}" placeholder="https://youtu.be/… oder https://vimeo.com/…">
+        <div class="small muted" style="margin-top:4px" id="vinfo">Tipp: Videos auf YouTube als <b>„Nicht gelistet“</b> hochladen, dann findet sie niemand über die Suche.</div></div>
+      <div class="two">
+        <div class="field"><label>Als gesehen ab (%)</label><input name="min_watch_pct" type="number" min="10" max="100" value="${m.min_watch_pct}"></div>
+        <div class="field"><label>Fragen bestanden ab (%)</label><input name="pass_pct" type="number" min="0" max="100" value="${m.pass_pct}"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="spread" style="margin-bottom:12px"><h2 style="margin:0">Kurze Fragen</h2><button type="button" class="btn ghost sm" id="addQ">+ Frage</button></div>
+      <p class="small muted" style="margin-top:0">Ohne Fragen ist das Video nach dem Ansehen abgeschlossen. Pro Frage mehrere Antworten, die richtige anklicken.</p>
+      <div id="qlist"></div>
+    </div>
+    <div id="msg"></div>
+    <div class="spread">
+      <button class="btn brass">Speichern</button>
+      ${!isNew ? '<button type="button" class="btn danger sm" id="del">Video löschen</button>' : ''}
+    </div>
+  </form>`;
+  const qlist = document.getElementById('qlist');
+  let qState = qs.map(q => ({ question: q.question, options: q.options.slice(), correct: q.correct_index }));
+  function renderQ(){
+    qlist.innerHTML = qState.map((q,i) => `
+      <div class="qedit" data-i="${i}">
+        <div class="spread" style="margin-bottom:8px"><b class="small">Frage ${i+1}</b><button type="button" class="btn ghost sm" data-rm="${i}">Entfernen</button></div>
+        <div class="field"><input data-f="question" value="${esc(q.question)}" placeholder="Frage" required></div>
+        ${q.options.map((o,j) => `<div class="row" style="margin-bottom:6px;flex-wrap:nowrap">
+          <input type="radio" name="c${i}" data-c="${j}" ${q.correct===j?'checked':''} style="width:auto" title="Richtige Antwort">
+          <input data-o="${j}" value="${esc(o)}" placeholder="Antwort ${j+1}">
+          ${q.options.length > 2 ? `<button type="button" class="btn ghost sm" data-ro="${j}" aria-label="Antwort entfernen">×</button>` : ''}
+        </div>`).join('')}
+        <button type="button" class="btn ghost sm" data-ao>+ Antwort</button>
+      </div>`).join('') || '<div class="small muted">Noch keine Fragen.</div>';
+    qlist.querySelectorAll('.qedit').forEach(el => {
+      const i = +el.dataset.i;
+      el.querySelector('[data-f]').oninput = e => qState[i].question = e.target.value;
+      el.querySelectorAll('[data-o]').forEach(inp => inp.oninput = e => qState[i].options[+inp.dataset.o] = e.target.value);
+      el.querySelectorAll('[data-c]').forEach(r => r.onchange = () => qState[i].correct = +r.dataset.c);
+      el.querySelectorAll('[data-ro]').forEach(b => b.onclick = () => { const j = +b.dataset.ro; qState[i].options.splice(j,1); if (qState[i].correct >= qState[i].options.length) qState[i].correct = 0; else if (qState[i].correct > j) qState[i].correct--; renderQ(); });
+      el.querySelector('[data-ao]').onclick = () => { qState[i].options.push(''); renderQ(); };
+      el.querySelector('[data-rm]').onclick = () => { qState.splice(i,1); renderQ(); };
+    });
+  }
+  renderQ();
+  document.getElementById('addQ').onclick = () => { qState.push({ question:'', options:['','',''], correct:0 }); renderQ(); };
+  const f = document.getElementById('mf'), msg = document.getElementById('msg');
+  const urlIn = f.querySelector('[name=url]'), vinfo = document.getElementById('vinfo');
+  urlIn.oninput = () => { const v = parseVideo(urlIn.value); vinfo.innerHTML = !urlIn.value ? 'Tipp: Videos auf YouTube als <b>„Nicht gelistet“</b> hochladen.' : v ? `✓ ${v.provider==='youtube'?'YouTube':'Vimeo'}-Video erkannt` : '<span style="color:var(--bad)">Link nicht erkannt – bitte den normalen YouTube- oder Vimeo-Link einfügen.</span>'; };
+  f.onsubmit = async e => {
+    e.preventDefault(); msg.innerHTML = '';
+    const fd = new FormData(f);
+    const v = parseVideo(fd.get('url'));
+    if (fd.get('url') && !v){ msg.innerHTML = '<div class="err">Der Video-Link wurde nicht erkannt.</div>'; return; }
+    const clean = qState.map(q => ({ ...q, options: q.options.map(o => o.trim()).filter(Boolean) }));
+    if (clean.some(q => !q.question.trim() || q.options.length < 2)){ msg.innerHTML = '<div class="err">Jede Frage braucht einen Text und mindestens zwei Antworten.</div>'; return; }
+    clean.forEach(q => { if (q.correct >= q.options.length) q.correct = 0; });
+    const modId = fd.get('module_id');
+    const row = { module_id: modId, title: fd.get('title').trim(), description: fd.get('description').trim(),
+      provider: v ? v.provider : 'youtube', video_ref: v ? v.ref : '',
+      min_watch_pct: +fd.get('min_watch_pct') || 90, pass_pct: +fd.get('pass_pct') || 0 };
+    const btn = f.querySelector('button.brass'); btn.disabled = true;
+    try{
+      let lid = id;
+      if (isNew || modId !== m.module_id){
+        const { data: mx } = await sb.from('lessons').select('position').eq('module_id', modId).order('position', { ascending:false }).limit(1);
+        row.position = (mx?.[0]?.position || 0) + 1;
+      }
+      if (isNew){
+        const { data, error } = await sb.from('lessons').insert(row).select().single(); if (error) throw error; lid = data.id;
+      } else {
+        const { error } = await sb.from('lessons').update(row).eq('id', id); if (error) throw error;
+        const { error: de } = await sb.from('lesson_quiz').delete().eq('lesson_id', id); if (de) throw de;
+      }
+      if (clean.length){
+        const { error } = await sb.from('lesson_quiz').insert(clean.map((q,i) => ({ lesson_id: lid, position: i+1, question: q.question.trim(), options: q.options, correct_index: q.correct })));
+        if (error) throw error;
+      }
+      toast('Video gespeichert'); location.hash = '#/admin/module/' + modId;
+    }catch(err){ msg.innerHTML = `<div class="err">${esc(errText(err))}</div>`; btn.disabled = false; }
+  };
+  const del = document.getElementById('del');
+  if (del) del.onclick = async () => {
+    if (!confirm('Video inklusive Fragen und aller Fortschritte dazu löschen?')) return;
+    const { error } = await sb.from('lessons').delete().eq('id', id);
+    if (error) return toast(errText(error)); toast('Gelöscht'); location.hash = '#/admin/module/' + m.module_id;
+  };
+}
+
+// ================= Admin: Einstellungen =================
+async function viewSettings(){
+  const { data: s, error } = await sb.from('settings').select('*').single();
+  if (error) throw error;
+  const base = location.origin + location.pathname;
+  const link = c => `${base}#/registrieren?code=${encodeURIComponent(c)}`;
+  $app.innerHTML = `
+  <form class="stack" id="sf">
+    <h1>Einstellungen</h1>
+    <div class="card stack">
+      <div><h3>Registrierungslink für neue Partner</h3><p class="small muted" style="margin:0">Diesen Link an neue Partner schicken – der Zugangscode ist schon eingetragen.</p></div>
+      <div class="row" style="flex-wrap:nowrap"><input id="lnk" readonly value="${esc(link(s.access_code))}"><button type="button" class="btn sm" id="copy">Kopieren</button></div>
+    </div>
+    <div class="card">
+      <div class="field"><label>Zugangscode</label><input name="access_code" required value="${esc(s.access_code)}">
+        <div class="small muted" style="margin-top:4px">Nur wer diesen Code kennt, kann sich registrieren. Nach einer Änderung funktionieren alte Links nicht mehr.</div></div>
+      <div class="field"><label>Admin-E-Mails (durch Komma getrennt)</label><input name="admin_emails" value="${esc(s.admin_emails.join(', '))}">
+        <div class="small muted" style="margin-top:4px">Wer sich mit diesen Adressen registriert, wird automatisch Admin (ohne Zugangscode).</div></div>
+      <div id="msg"></div>
+      <button class="btn brass">Speichern</button>
+    </div>
+  </form>`;
+  document.getElementById('copy').onclick = async () => { const v = document.getElementById('lnk').value; try{ await navigator.clipboard.writeText(v); toast('Link kopiert'); }catch(e){ document.getElementById('lnk').select(); } };
+  const f = document.getElementById('sf');
+  f.onsubmit = async e => {
+    e.preventDefault(); const fd = new FormData(f);
+    const upd = { access_code: fd.get('access_code').trim(), admin_emails: fd.get('admin_emails').split(',').map(x => x.trim()).filter(Boolean), updated_at: new Date().toISOString() };
+    const { error } = await sb.from('settings').update(upd).eq('id', 1);
+    if (error){ document.getElementById('msg').innerHTML = `<div class="err" style="margin-bottom:12px">${esc(errText(error))}</div>`; return; }
+    document.getElementById('lnk').value = link(upd.access_code); toast('Gespeichert');
+  };
+}
+
+// ================= Start =================
+async function loadProfile(){
+  const { data, error } = await sb.from('profiles').select('*').eq('id', S.session.user.id).maybeSingle();
+  if (error) console.warn(error);
+  S.profile = data;
+}
+sb.auth.onAuthStateChange((event, session) => {
+  const changed = (session?.user?.id || null) !== (S.session?.user?.id || null);
+  S.session = session;
+  if (!changed && event !== 'INITIAL_SESSION') return;
+  // außerhalb des Callbacks weiterarbeiten (vermeidet Deadlocks in supabase-js)
+  setTimeout(async () => {
+    if (session){
+      await loadProfile();
+      if (location.hash.startsWith('#/registrieren')){ history.replaceState(null, '', location.pathname + '#/'); }
+    } else S.profile = null;
+    route();
+  }, 0);
+});
+</script>
+</body>
+</html>
