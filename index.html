@@ -188,9 +188,11 @@ function isDone(l){
   if (!p || !p.video_completed_at) return false;
   return !!p.quiz_passed_at || hasQuiz[l.id] === 0;
 }
+const freeOrder = id => !!S.modules.find(m => m.id === id)?.free_order;
 function lessonStatus(l, idx){
   const p = S.progress[l.id];
-  if (S.lessons.slice(0, idx).some(x => !isDone(x))) return 'locked';
+  const free = freeOrder(l.module_id);
+  if (S.lessons.slice(0, idx).some(x => !isDone(x) && !(free && freeOrder(x.module_id)))) return 'locked';
   if (isDone(l)) return 'done';
   if (p && p.video_completed_at) return 'quiz';
   if (p) return 'started';
@@ -582,11 +584,13 @@ async function loadAll(){
 function summarize(D, p){
   const mine = D.progress.filter(x => x.user_id === p.id);
   const by = {}; mine.forEach(x => by[x.lesson_id] = x);
-  const done = D.lessons.filter(l => { const x = by[l.id]; return x && x.video_completed_at && (x.quiz_passed_at || !D.qCount[l.id]); });
-  const current = D.lessons.find(l => !done.includes(l));
+  const seeMod = {}; D.modules.forEach(m => seeMod[m.id] = m.audience !== 'fuehrung' || p.is_leader);
+  const vis = D.lessons.filter(l => seeMod[l.module_id]);
+  const done = vis.filter(l => { const x = by[l.id]; return x && x.video_completed_at && (x.quiz_passed_at || !D.qCount[l.id]); });
+  const current = vis.find(l => !done.includes(l));
   const lastAct = [p.last_seen_at, ...mine.map(x => x.updated_at)].filter(Boolean).sort().pop();
   const lastRem = D.reminders.find(r => r.user_id === p.id);
-  const total = D.lessons.length;
+  const total = vis.length;
   let status;
   if (total && done.length === total) status = ['Abgeschlossen','b-ok'];
   else if (!mine.length) status = (daysSince(p.created_at) >= INACTIVE_DAYS) ? ['Nicht begonnen','b-bad'] : ['Nicht begonnen','b-n'];
@@ -621,7 +625,7 @@ async function viewAdmin(){
   const rows = partners.map(p => ({ p, s: summarize(D, p) }));
   const finished = rows.filter(r => r.s.status[1] === 'b-ok').length;
   const inactive = rows.filter(r => r.s.needsReminder);
-  const avg = rows.length && D.lessons.length ? Math.round(rows.reduce((a,r) => a + r.s.done.length / D.lessons.length, 0) / rows.length * 100) : 0;
+  const avg = rows.length ? Math.round(rows.reduce((a,r) => a + (r.s.total ? r.s.done.length / r.s.total : 0), 0) / rows.length * 100) : 0;
   $app.innerHTML = `
   <div class="stack">
     <div class="spread"><div><h1>Team-Übersicht</h1><p class="muted" style="margin:0">Wer hat welche Videos angesehen und bestanden.</p></div>
@@ -680,7 +684,7 @@ async function viewPartner(id){
   $app.innerHTML = `
   <div class="stack">
     <a href="#/admin" class="small">← Team-Übersicht</a>
-    <div class="spread"><div><h1>${esc(p.full_name || '(ohne Namen)')}</h1><div class="muted">${esc(p.email)} · registriert ${fmtDate(p.created_at)} · zuletzt aktiv ${fmtDateTime(s.lastAct)}</div></div>
+    <div class="spread"><div><h1>${esc(p.full_name || '(ohne Namen)')}</h1><div class="muted">${p.is_leader ? '<span class="badge b-ok">Führungskraft</span> · ' : ''}${esc(p.email)} · registriert ${fmtDate(p.created_at)} · zuletzt aktiv ${fmtDateTime(s.lastAct)}</div></div>
       <span class="badge ${s.status[1]}">${s.status[0]}</span></div>
     <div class="card scroll"><table class="tbl cards">
       <thead><tr><th>Video</th><th>Angesehen</th><th>Video fertig</th><th>Fragen</th><th>Versuche</th></tr></thead>
@@ -695,6 +699,7 @@ async function viewPartner(id){
       ${rems.length ? `<div class="small">${rems.map(r => fmtDateTime(r.sent_at)).join(' · ')}</div>` : '<div class="small muted">Noch keine Erinnerung gesendet.</div>'}
       <div class="row">
         ${s.status[1] !== 'b-ok' ? `<button class="btn sm" id="rem">Erinnerung per E-Mail</button>` : ''}
+        <button class="btn ghost sm" id="leader">${p.is_leader ? 'Führungskraft entfernen' : 'Zur Führungskraft machen'}</button>
         <button class="btn ghost sm" id="role">${p.role === 'admin' ? 'Admin-Rechte entfernen' : 'Zum Admin machen'}</button>
         <button class="btn ghost sm" id="reset">Fortschritt zurücksetzen</button>
         ${p.role !== 'admin' ? '<button class="btn danger sm" id="delUser">Mitarbeiter löschen</button>' : ''}
@@ -705,6 +710,12 @@ async function viewPartner(id){
   if (rb) rb.onclick = async () => { const { subject, body } = reminderMail(D, p, s);
     location.href = `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     await logReminder([p.id]); setTimeout(() => viewPartner(id), 800); };
+  document.getElementById('leader').onclick = async () => {
+    const nl = !p.is_leader;
+    if (!confirm(nl ? `${p.full_name} zur Führungskraft machen? Die Person sieht dann die Führungskräfte-Bereiche.` : `${p.full_name} die Führungskraft-Rechte entziehen?`)) return;
+    const { error } = await sb.rpc('admin_set_leader', { p_user: p.id, p_leader: nl });
+    if (error) return toast(errText(error)); toast('Gespeichert'); viewPartner(id);
+  };
   document.getElementById('role').onclick = async () => {
     const nr = p.role === 'admin' ? 'partner' : 'admin';
     if (!confirm(nr === 'admin' ? `${p.full_name} Admin-Rechte geben? Die Person sieht dann alle Teilnehmer.` : 'Admin-Rechte entfernen?')) return;
@@ -737,7 +748,7 @@ async function viewModules(){
       <div class="card mod">
         <div class="num">${i+1}</div>
         <div class="meta"><b>${esc(m.title)}</b>
-          <div class="small muted">${plural(cnt[m.id]||0,'Video','Videos')}${m.description ? ' · ' + esc(m.description) : ''}</div></div>
+          <div class="small muted">${m.audience==='fuehrung' ? 'Nur Führungskräfte · ' : ''}${plural(cnt[m.id]||0,'Video','Videos')}${m.description ? ' · ' + esc(m.description) : ''}</div></div>
         <div class="row">
           <button class="btn ghost sm" data-up="${i}" ${i===0?'disabled':''} aria-label="Nach oben">↑</button>
           <button class="btn ghost sm" data-down="${i}" ${i===D.modules.length-1?'disabled':''} aria-label="Nach unten">↓</button>
@@ -756,7 +767,7 @@ async function viewModules(){
 
 async function viewModuleEdit(id){
   const isNew = id === 'neu';
-  let m = { title:'', description:'' }, ls = [], qCount = {};
+  let m = { title:'', description:'', audience:'alle', free_order:true }, ls = [], qCount = {};
   if (!isNew){
     const [{ data: mm, error: e1 }, { data: ll, error: e2 }, { data: qq, error: e3 }] = await Promise.all([
       sb.from('modules').select('*').eq('id', id).single(),
@@ -774,6 +785,10 @@ async function viewModuleEdit(id){
       <div class="card">
         <div class="field"><label>Titel des Bereichs</label><input name="title" required value="${esc(m.title)}" placeholder="z. B. Grundlagen der Beratung"></div>
         <div class="field"><label>Kurzbeschreibung</label><textarea name="description" rows="2" placeholder="Worum geht es in diesem Bereich?">${esc(m.description)}</textarea></div>
+        <div class="field"><label>Wer sieht diesen Bereich?</label><select name="audience">
+          <option value="alle" ${m.audience!=='fuehrung'?'selected':''}>Alle Mitarbeiter</option>
+          <option value="fuehrung" ${m.audience==='fuehrung'?'selected':''}>Nur Führungskräfte</option></select></div>
+        <div class="field"><label><input type="checkbox" name="free_order" ${m.free_order?'checked':''}> Videos in beliebiger Reihenfolge ansehen (nicht gesperrt)</label></div>
         <div id="msg"></div>
         <div class="spread">
           <button class="btn brass">${isNew ? 'Bereich anlegen' : 'Speichern'}</button>
@@ -799,7 +814,7 @@ async function viewModuleEdit(id){
   f.onsubmit = async e => {
     e.preventDefault(); msg.innerHTML = '';
     const fd = new FormData(f);
-    const row = { title: fd.get('title').trim(), description: fd.get('description').trim() };
+    const row = { title: fd.get('title').trim(), description: fd.get('description').trim(), audience: fd.get('audience'), free_order: fd.get('free_order') === 'on' };
     const btn = f.querySelector('button.brass'); btn.disabled = true;
     try{
       if (isNew){
