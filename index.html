@@ -124,6 +124,8 @@ const firstName = n => (n || '').trim().split(/\s+/)[0] || '';
 function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2800); }
 function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+const isMp3 = f => !!f && /\.mp3$/i.test(f.name || f.path || '');
+const fmtMB = b => (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
 function plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
 function errText(e){
   const m = (e && (e.message || e.error_description)) || String(e);
@@ -132,6 +134,8 @@ function errText(e){
   if (/already registered|already been registered/i.test(m)) return 'Diese E-Mail ist bereits registriert. Bitte melde dich an.';
   if (/Password should be at least/i.test(m)) return 'Das Passwort muss mindestens 6 Zeichen haben.';
   if (/Email not confirmed/i.test(m)) return 'Deine E-Mail ist noch nicht bestätigt.';
+  if (/exceeded the maximum allowed size|Payload too large/i.test(m)) return 'Die Datei ist zu groß (maximal 50 MB).';
+  if (/mime type/i.test(m)) return 'Es sind nur MP3-Dateien erlaubt.';
   return m;
 }
 
@@ -380,15 +384,19 @@ async function viewLesson(id){
   const inArea = lessonsOf(area.id), pos = inArea.indexOf(m) + 1;
   if (lessonStatus(m, idx) === 'locked'){ $app.innerHTML = `<div class="note">Dieses Video ist noch gesperrt. Schau dir zuerst die vorherigen Videos an.</div><p><a href="#/">Zur Übersicht</a></p>`; return; }
   const nextL = S.lessons[idx+1];
+  const { data: lfiles } = await sb.from('lesson_files').select('*').eq('lesson_id', m.id).order('position');
+  const audioFile = (lfiles || []).find(isMp3);
+  const isAudio = !!audioFile && !m.video_ref;
+  const kind = isAudio ? 'Audio' : 'Video';
   $app.innerHTML = `
   <div class="stack">
     <a href="#/modul/${area.id}" class="small">← ${esc(area.title)}</a>
-    <div><div class="small muted">Video ${pos} von ${inArea.length}</div><h1>${esc(m.title)}</h1>${m.description?`<p class="muted" style="margin:0">${esc(m.description)}</p>`:''}</div>
+    <div><div class="small muted">${kind} ${pos} von ${inArea.length}</div><h1>${esc(m.title)}</h1>${m.description?`<p class="muted" style="margin:0">${esc(m.description)}</p>`:''}</div>
     <div class="video" id="video"></div>
     <div class="card">
-      <div class="spread small"><span>Angesehen: <b id="pctTxt">0 %</b></span><span class="muted">Ab ${m.min_watch_pct} % gilt das Video als gesehen</span></div>
+      <div class="spread small"><span>${isAudio ? 'Angehört' : 'Angesehen'}: <b id="pctTxt">0 %</b></span><span class="muted">Ab ${m.min_watch_pct} % gilt ${isAudio ? 'das Audio als gehört' : 'das Video als gesehen'}</span></div>
       <div class="bar" style="margin-top:8px"><i id="pctBar" style="width:0"></i></div>
-      <p class="small muted" style="margin:10px 0 0">Vorspulen zählt nicht – nur tatsächlich angesehene Abschnitte werden gewertet. Dein Fortschritt wird automatisch gespeichert.</p>
+      <p class="small muted" style="margin:10px 0 0">Vorspulen zählt nicht – nur tatsächlich ${isAudio ? 'angehörte' : 'angesehene'} Abschnitte werden gewertet. Dein Fortschritt wird automatisch gespeichert.</p>
     </div>
     <div id="quiz"></div>
   </div>`;
@@ -417,7 +425,7 @@ async function viewLesson(id){
     const { data, error } = await sb.rpc('report_lesson_watch', { p_lesson: m.id, p_watched_seconds: cnt, p_duration: Math.floor(duration) });
     if (error){ console.warn(error); return; }
     S.progress[m.id] = data;
-    if (data.video_completed_at && !completed){ completed = true; toast('Video abgeschlossen ✓'); updateUI(); showQuiz(); }
+    if (data.video_completed_at && !completed){ completed = true; toast(kind + ' abgeschlossen ✓'); updateUI(); showQuiz(); }
   }
 
   function tick(t, playing){
@@ -433,7 +441,28 @@ async function viewLesson(id){
   }
 
   const box = document.getElementById('video');
-  if (!m.video_ref){
+  if (isAudio){
+    box.className = 'card';
+    const { data: su, error: se } = await sb.storage.from('telefonleitfaeden').createSignedUrl(audioFile.path, 3600);
+    if (se || !su?.signedUrl){
+      box.innerHTML = '<div class="err">Die Audio-Datei konnte nicht geladen werden.</div>';
+    } else {
+      box.innerHTML = `<div class="small muted" style="margin-bottom:8px">${esc(audioFile.name)}</div><audio id="au" controls preload="metadata" controlsList="nodownload" style="width:100%"></audio>`;
+      const au = document.getElementById('au');
+      const startAt = lsGet(posKey) || 0;
+      au.addEventListener('loadedmetadata', () => {
+        if (isFinite(au.duration)) duration = au.duration;
+        if (startAt && startAt < duration - 2) au.currentTime = startAt;
+        updateUI();
+      });
+      au.addEventListener('pause', () => send(true));
+      au.addEventListener('ended', () => send(true));
+      au.addEventListener('seeked', () => { lastT = null; });
+      au.src = su.signedUrl;
+      const timer = setInterval(() => tick(au.currentTime, !au.paused && !au.ended), 1000);
+      cleanup = () => { clearInterval(timer); send(true); try{ au.pause(); }catch(e){} };
+    }
+  } else if (!m.video_ref){
     box.innerHTML = `<div class="ph">Für dieses Video ist noch kein Link hinterlegt.</div>`;
   } else if (m.provider === 'youtube'){
     await loadScript('https://www.youtube.com/iframe_api', () => window.YT && window.YT.Player, true);
@@ -484,12 +513,12 @@ async function viewLesson(id){
     if (error){ qbox.innerHTML = `<div class="err">${esc(errText(error))}</div>`; return; }
     hasQuiz[m.id] = qs.length;
     const p = S.progress[m.id];
-    if (!qs.length){ qbox.innerHTML = `<div class="card stack"><div class="okbox">Video abgeschlossen ✓</div><div>${nextLink()}</div></div>`; return; }
+    if (!qs.length){ qbox.innerHTML = `<div class="card stack"><div class="okbox">${kind} abgeschlossen ✓</div><div>${nextLink()}</div></div>`; return; }
     if (p?.quiz_passed_at){ qbox.innerHTML = `<div class="card stack"><h2>Kurze Fragen</h2><div class="okbox">Bestanden mit ${p.quiz_score} % ✓</div><div>${nextLink()}</div></div>`; return; }
     qbox.innerHTML = `
       <form class="card" id="qf">
         <h2>Kurze Fragen</h2>
-        <p class="muted small">Beantworte die Fragen, um das Video abzuschließen. Zum Bestehen brauchst du ${m.pass_pct} %.</p>
+        <p class="muted small">Beantworte die Fragen, um ${isAudio ? 'das Audio' : 'das Video'} abzuschließen. Zum Bestehen brauchst du ${m.pass_pct} %.</p>
         ${qs.map((q,i) => `<div class="q" data-q="${q.id}"><p>${i+1}. ${esc(q.question)}</p>
           ${q.options.map((o,j) => `<label class="opt"><input type="radio" name="${q.id}" value="${j}" required> <span>${esc(o)}</span></label>`).join('')}
         </div>`).join('')}
@@ -508,7 +537,7 @@ async function viewLesson(id){
       if (r.passed){
         S.progress[m.id] = { ...(S.progress[m.id]||{}), quiz_passed_at: new Date().toISOString(), quiz_score: r.score };
         qbox.innerHTML = `<div class="card stack"><h2>Kurze Fragen</h2><div class="okbox">Bestanden! ${r.correct} von ${r.total} richtig (${r.score} %).</div><div>${nextLink()}</div></div>`;
-        toast('Video abgeschlossen ✓');
+        toast(kind + ' abgeschlossen ✓');
       } else {
         document.getElementById('qres').innerHTML = `<div class="note" style="margin-bottom:12px">${r.correct} von ${r.total} richtig (${r.score} %). Die rot markierten Fragen stimmen noch nicht – versuch es nochmal.</div>`;
       }
@@ -767,15 +796,17 @@ async function viewModules(){
 
 async function viewModuleEdit(id){
   const isNew = id === 'neu';
-  let m = { title:'', description:'', audience:'alle', free_order:true }, ls = [], qCount = {};
+  let m = { title:'', description:'', audience:'alle', free_order:true }, ls = [], qCount = {}, audioSet = {};
   if (!isNew){
-    const [{ data: mm, error: e1 }, { data: ll, error: e2 }, { data: qq, error: e3 }] = await Promise.all([
+    const [{ data: mm, error: e1 }, { data: ll, error: e2 }, { data: qq, error: e3 }, { data: ff }] = await Promise.all([
       sb.from('modules').select('*').eq('id', id).single(),
       sb.from('lessons').select('*').eq('module_id', id).order('position').order('created_at'),
-      sb.from('lesson_quiz').select('lesson_id')
+      sb.from('lesson_quiz').select('lesson_id'),
+      sb.from('lesson_files').select('lesson_id,name,path')
     ]);
     if (e1 || e2 || e3) throw (e1 || e2 || e3);
     m = mm; ls = ll; qq.forEach(q => qCount[q.lesson_id] = (qCount[q.lesson_id]||0) + 1);
+    (ff || []).filter(isMp3).forEach(f => audioSet[f.lesson_id] = true);
   }
   $app.innerHTML = `
   <div class="stack">
@@ -802,7 +833,7 @@ async function viewModuleEdit(id){
       <div class="card mod">
         <div class="num">${i+1}</div>
         <div class="meta"><b>${esc(l.title)}</b>
-          <div class="small muted">${l.video_ref ? (l.provider==='youtube'?'YouTube':'Vimeo') : '<span style="color:var(--bad)">Kein Video hinterlegt</span>'} · ${plural(qCount[l.id]||0,'Frage','Fragen')} · ab ${l.min_watch_pct} % gesehen</div></div>
+          <div class="small muted">${l.video_ref ? (l.provider==='youtube'?'YouTube':'Vimeo') : audioSet[l.id] ? 'Audio (MP3)' : '<span style="color:var(--bad)">Kein Video hinterlegt</span>'} · ${plural(qCount[l.id]||0,'Frage','Fragen')} · ab ${l.min_watch_pct} % gesehen</div></div>
         <div class="row">
           <button class="btn ghost sm" data-up="${i}" ${i===0?'disabled':''} aria-label="Nach oben">↑</button>
           <button class="btn ghost sm" data-down="${i}" ${i===ls.length-1?'disabled':''} aria-label="Nach unten">↓</button>
@@ -848,15 +879,16 @@ async function viewLessonEdit(id, presetModule){
   const isNew = id === 'neu';
   const { data: mods, error: em } = await sb.from('modules').select('id,title').order('position').order('created_at');
   if (em) throw em;
-  let m = { module_id: presetModule || mods[0]?.id, title:'', description:'', provider:'youtube', video_ref:'', min_watch_pct:90, pass_pct:80 }, qs = [];
+  let m = { module_id: presetModule || mods[0]?.id, title:'', description:'', provider:'youtube', video_ref:'', min_watch_pct:90, pass_pct:80 }, qs = [], audio = null, pendingMp3 = null;
   if (!mods.length){ $app.innerHTML = '<div class="note">Lege zuerst einen Bereich an.</div><p><a href="#/admin/module/neu">+ Neuer Bereich</a></p>'; return; }
   if (!isNew){
-    const [{ data: mm, error: e1 }, { data: qq, error: e2 }] = await Promise.all([
+    const [{ data: mm, error: e1 }, { data: qq, error: e2 }, { data: ff }] = await Promise.all([
       sb.from('lessons').select('*').eq('id', id).single(),
-      sb.from('lesson_quiz').select('*').eq('lesson_id', id).order('position')
+      sb.from('lesson_quiz').select('*').eq('lesson_id', id).order('position'),
+      sb.from('lesson_files').select('*').eq('lesson_id', id)
     ]);
     if (e1 || e2) throw (e1 || e2);
-    m = mm; qs = qq;
+    m = mm; qs = qq; audio = (ff || []).find(isMp3) || null;
   }
   $app.innerHTML = `
   <form class="stack" id="mf">
@@ -866,12 +898,19 @@ async function viewLessonEdit(id, presetModule){
       <div class="field"><label>Bereich</label><select name="module_id">${mods.map(x => `<option value="${x.id}" ${x.id===m.module_id?'selected':''}>${esc(x.title)}</option>`).join('')}</select></div>
       <div class="field"><label>Titel des Videos</label><input name="title" required value="${esc(m.title)}"></div>
       <div class="field"><label>Beschreibung</label><textarea name="description" rows="3" placeholder="Worum geht es in diesem Video?">${esc(m.description)}</textarea></div>
-      <div class="field"><label>Video-Link (YouTube oder Vimeo)</label><input name="url" value="${esc(videoUrl(m))}" placeholder="https://youtu.be/… oder https://vimeo.com/…">
+      <div class="field"><label>Video-Link (YouTube oder Vimeo)</label><input name="url" value="${esc(videoUrl(m))}" placeholder="https://youtu.be/… oder https://vimeo.com/… (leer lassen bei reinen Audio-Lektionen)">
         <div class="small muted" style="margin-top:4px" id="vinfo">Tipp: Videos auf YouTube als <b>„Nicht gelistet“</b> hochladen, dann findet sie niemand über die Suche.</div></div>
       <div class="two">
         <div class="field"><label>Als gesehen ab (%)</label><input name="min_watch_pct" type="number" min="10" max="100" value="${m.min_watch_pct}"></div>
         <div class="field"><label>Fragen bestanden ab (%)</label><input name="pass_pct" type="number" min="0" max="100" value="${m.pass_pct}"></div>
       </div>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Audio (MP3)</h2>
+      <p class="small muted" style="margin-top:0">Zum Beispiel für Telefonleitfäden: eine MP3-Datei, maximal 50 MB. Ohne Video-Link erscheint die Lektion als reine Audio-Lektion mit Player.</p>
+      <div id="audioCur" style="margin-bottom:10px"></div>
+      <div class="field" style="margin-bottom:6px"><input type="file" id="mp3" accept="audio/mpeg,.mp3"></div>
+      <div class="small muted" id="mp3info"></div>
     </div>
     <div class="card">
       <div class="spread" style="margin-bottom:12px"><h2 style="margin:0">Kurze Fragen</h2><button type="button" class="btn ghost sm" id="addQ">+ Frage</button></div>
@@ -911,6 +950,43 @@ async function viewLessonEdit(id, presetModule){
   renderQ();
   document.getElementById('addQ').onclick = () => { qState.push({ question:'', options:['','',''], correct:0 }); renderQ(); };
   const f = document.getElementById('mf'), msg = document.getElementById('msg');
+  const BUCKET = 'telefonleitfaeden';
+  const audioCur = document.getElementById('audioCur'), mp3In = document.getElementById('mp3'), mp3Info = document.getElementById('mp3info');
+  function renderAudio(){
+    audioCur.innerHTML = audio
+      ? `<div class="spread"><div class="small"><b>${esc(audio.name)}</b> · ${fmtMB(audio.size_bytes || 0)}</div><button type="button" class="btn ghost sm" id="rmAudio">Entfernen</button></div>`
+      : '<div class="small muted">Noch keine MP3-Datei hinterlegt.</div>';
+    const rb = document.getElementById('rmAudio');
+    if (rb) rb.onclick = async () => {
+      if (!confirm('MP3-Datei dieser Lektion entfernen?')) return;
+      const r1 = await sb.storage.from(BUCKET).remove([audio.path]);
+      if (r1.error) return toast(errText(r1.error));
+      const { error } = await sb.from('lesson_files').delete().eq('id', audio.id);
+      if (error) return toast(errText(error));
+      audio = null; renderAudio(); toast('MP3 entfernt');
+    };
+  }
+  renderAudio();
+  mp3In.onchange = () => {
+    const file = mp3In.files[0]; pendingMp3 = null; mp3Info.innerHTML = '';
+    if (!file) return;
+    if (!/\.mp3$/i.test(file.name) || (file.type && !/^audio\/(mpeg|mp3)$/.test(file.type))){
+      mp3In.value = ''; mp3Info.innerHTML = '<span style="color:var(--bad)">Bitte nur eine MP3-Datei auswählen.</span>'; return;
+    }
+    if (file.size > 52428800){
+      mp3In.value = ''; mp3Info.innerHTML = `<span style="color:var(--bad)">Die Datei ist ${fmtMB(file.size)} groß. Erlaubt sind maximal 50 MB.</span>`; return;
+    }
+    pendingMp3 = file;
+    mp3Info.textContent = `Wird beim Speichern hochgeladen: ${file.name} (${fmtMB(file.size)})${audio ? ' – ersetzt die bisherige Datei' : ''}`;
+  };
+  async function uploadMp3(lid){
+    const file = pendingMp3, path = `${lid}/${Date.now()}.mp3`;
+    const up = await sb.storage.from(BUCKET).upload(path, file, { contentType: 'audio/mpeg', upsert: false });
+    if (up.error) throw up.error;
+    const { error: ie } = await sb.from('lesson_files').insert({ lesson_id: lid, name: file.name, path, size_bytes: file.size, position: 1 });
+    if (ie){ await sb.storage.from(BUCKET).remove([path]); throw ie; }
+    if (audio){ await sb.storage.from(BUCKET).remove([audio.path]); await sb.from('lesson_files').delete().eq('id', audio.id); }
+  }
   const urlIn = f.querySelector('[name=url]'), vinfo = document.getElementById('vinfo');
   urlIn.oninput = () => { const v = parseVideo(urlIn.value); vinfo.innerHTML = !urlIn.value ? 'Tipp: Videos auf YouTube als <b>„Nicht gelistet“</b> hochladen.' : v ? `✓ ${v.provider==='youtube'?'YouTube':'Vimeo'}-Video erkannt` : '<span style="color:var(--bad)">Link nicht erkannt – bitte den normalen YouTube- oder Vimeo-Link einfügen.</span>'; };
   f.onsubmit = async e => {
@@ -942,12 +1018,22 @@ async function viewLessonEdit(id, presetModule){
         const { error } = await sb.from('lesson_quiz').insert(clean.map((q,i) => ({ lesson_id: lid, position: i+1, question: q.question.trim(), options: q.options, correct_index: q.correct })));
         if (error) throw error;
       }
+      if (pendingMp3){
+        msg.innerHTML = '<div class="note">MP3 wird hochgeladen … bitte kurz warten.</div>';
+        try{ await uploadMp3(lid); }
+        catch(ue){
+          toast('Gespeichert, aber die MP3 konnte nicht hochgeladen werden: ' + errText(ue));
+          if (location.hash === '#/admin/video/' + lid) viewLessonEdit(lid); else location.hash = '#/admin/video/' + lid;
+          return;
+        }
+      }
       toast('Video gespeichert'); location.hash = '#/admin/module/' + modId;
     }catch(err){ msg.innerHTML = `<div class="err">${esc(errText(err))}</div>`; btn.disabled = false; }
   };
   const del = document.getElementById('del');
   if (del) del.onclick = async () => {
     if (!confirm('Video inklusive Fragen und aller Fortschritte dazu löschen?')) return;
+    if (audio) await sb.storage.from(BUCKET).remove([audio.path]);
     const { error } = await sb.from('lessons').delete().eq('id', id);
     if (error) return toast(errText(error)); toast('Gelöscht'); location.hash = '#/admin/module/' + m.module_id;
   };
